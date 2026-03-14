@@ -20,23 +20,26 @@ const UserSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     profile: {
-      displayName: String,
-      bio: String,
-      avatarUrl: String,
-      bannerColor: { type: String, default: "#ffffff" },
+      bio: { type: String, default: "" },
+      avatarUrl: { type: String, default: "" },
     },
     theme: {
-      backgroundColor: { type: String, default: "#000000" },
-      buttonColor: { type: String, default: "#1f1f1f" },
+      backgroundColor: { type: String, default: "#ffffff" },
+      buttonColor: { type: String, default: "#000000" },
       buttonTextColor: { type: String, default: "#ffffff" },
-      fontFamily: { type: String, default: "sans-serif" },
     },
-    links: [LinkSchema],
+    // 👇 ESTO ES LO QUE NECESITAMOS
     socials: {
       instagram: { type: String, default: "" },
       github: { type: String, default: "" },
       twitter: { type: String, default: "" },
     },
+    links: [
+      {
+        title: String,
+        url: String,
+      },
+    ],
   },
   { timestamps: true },
 );
