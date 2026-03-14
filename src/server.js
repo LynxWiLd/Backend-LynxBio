@@ -17,10 +17,18 @@ const app = express();
 // 3. Middlewares Globales
 app.use(
   cors({
-    origin: [process.env.FRONTEND_URL, "http://localhost:5173"],
+    origin: [
+      process.env.FRONTEND_URL, // Tu URL de producción
+      "https://lynxbio.vercel.app", // Tu dominio principal
+      "http://localhost:5173", // Desarrollo local
+      /\.vercel\.app$/, // 👈 TIP PRO: Permite cualquier subdominio de Vercel
+    ],
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-auth-token"], // 👈 IMPORTANTE: x-auth-token
   }),
-); // Permite peticiones desde Vercel
+);
+// Permite peticiones desde Vercel
 app.use(morgan("dev")); // Logs de peticiones en consola
 app.use(express.json()); // Permite recibir JSON en el body
 
