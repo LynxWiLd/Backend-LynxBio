@@ -32,11 +32,13 @@ const UserSchema = new mongoose.Schema(
       {
         title: { type: String, required: true },
         url: { type: String, required: true },
-        active: { type: Boolean, default: true },
+        // 👇 Agregamos estos dos campos a cada link individual
+        buttonColor: { type: String, default: "#000000" },
+        buttonTextColor: { type: String, default: "#ffffff" },
       },
     ],
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export default mongoose.model("User", UserSchema);
