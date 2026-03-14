@@ -1,10 +1,12 @@
-import User from "../models/User.js"; // El .js es obligatorio aquí
+import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+// --- REGISTRO DE USUARIO ---
 export const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
+    console.log("Intentando registrar a:", email);
 
     // 1. Verificar si el usuario o email ya existen
     let user = await User.findOne({ $or: [{ email }, { username }] });
@@ -16,11 +18,13 @@ export const register = async (req, res) => {
     user = new User({ username, email, password });
 
     // 3. Encriptar contraseña
+    // (Asegurate de que en models/User.js NO tengas un pre-save que vuelva a encriptar)
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
 
     // 4. Guardar en DB
     await user.save();
+    console.log("Usuario guardado exitosamente");
 
     // 5. Crear el Token (JWT)
     const payload = { userId: user.id };
@@ -30,24 +34,30 @@ export const register = async (req, res) => {
 
     res.status(201).json({ token, username: user.username });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error en el servidor");
+    console.error("Error en Register:", err);
+    res.status(500).json({ msg: "Error al registrar usuario" });
   }
 };
-// Agrega "login" a tus exports en src/controllers/authController.js
+
+// --- LOGIN DE USUARIO ---
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log("Intento de login para:", email);
 
     // 1. Verificar si el usuario existe
     let user = await User.findOne({ email });
     if (!user) {
+      console.log("Login fallido: Email no encontrado");
       return res.status(400).json({ msg: "Credenciales inválidas" });
     }
 
     // 2. Comparar la contraseña
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log("¿La contraseña coincide?:", isMatch);
+
     if (!isMatch) {
+      console.log("Login fallido: Contraseña incorrecta");
       return res.status(400).json({ msg: "Credenciales inválidas" });
     }
 
@@ -60,18 +70,20 @@ export const login = async (req, res) => {
     res.json({
       token,
       username: user.username,
-      profile: user.profile, // Mandamos esto para que el front sepa qué mostrar
+      profile: user.profile,
+      theme: user.theme,
+      socials: user.socials,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error en el servidor");
+    console.error("Error en Login:", err);
+    res.status(500).json({ msg: "Error en el servidor" });
   }
 };
-// Buscamos un usuario por su username para mostrar su página pública
+
+// --- OBTENER PERFIL PÚBLICO (Sin Token) ---
 export const getPublicProfile = async (req, res) => {
   try {
     const { username } = req.params;
-    // Buscamos solo los datos necesarios (nombre, bio, links, perfil, redes)
     const user = await User.findOne({ username }).select(
       "profile theme links socials username",
     );
@@ -80,39 +92,42 @@ export const getPublicProfile = async (req, res) => {
 
     res.json(user);
   } catch (err) {
+    console.error("Error en getPublicProfile:", err);
     res.status(500).send("Error al obtener el perfil");
   }
 };
-// Agrega esta función a authController.js
+
+// --- ACTUALIZAR CONFIGURACIÓN (Privado) ---
 export const updateSettings = async (req, res) => {
   try {
-    // 👇 AGREGÁ ESTA LÍNEA PARA DEBUGEAR
-    console.log("Datos recibidos en el backend:", req.body);
+    console.log("Datos recibidos para actualizar:", req.body);
 
     const { profile, theme, socials } = req.body;
 
     const user = await User.findByIdAndUpdate(
       req.userId,
       { profile, theme, socials },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
 
     res.json(user);
   } catch (err) {
-    console.error("Error al actualizar settings:", err);
+    console.error("Error en updateSettings:", err);
     res.status(500).json({ msg: "Error al guardar la configuración" });
   }
 };
+
+// --- OBTENER MI PROPIO PERFIL (Privado) ---
 export const getMe = async (req, res) => {
   try {
-    // Buscamos al usuario por el ID que el middleware 'auth' puso en req.userId
     const user = await User.findById(req.userId).select("-password");
     if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
 
     res.json(user);
   } catch (err) {
+    console.error("Error en getMe:", err);
     res.status(500).send("Error al obtener datos del usuario");
   }
 };
