@@ -2,30 +2,26 @@ import User from "../models/User.js";
 
 export const addLink = async (req, res) => {
   try {
-    const { title, url, icon } = req.body;
+    // 1. Extraemos TODO lo que manda el frontend, incluyendo los colores
+    const { title, url, buttonColor, buttonTextColor } = req.body;
 
-    // 1. Validaciones básicas
-    if (!title || !url) {
-      return res.status(400).json({ msg: "Título y URL son obligatorios" });
-    }
-
-    // 2. Buscar al usuario y agregar el link al array
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
 
-    // Creamos el nuevo objeto de link
-    const newLink = { title, url, icon };
+    // 2. Creamos el objeto del link con los colores
+    const newLink = {
+      title,
+      url,
+      buttonColor: buttonColor || "#000000", // Valor por defecto si viene vacío
+      buttonTextColor: buttonTextColor || "#ffffff",
+    };
 
-    // Lo agregamos al inicio del array (unshift) o al final (push)
-    user.links.unshift(newLink);
-
+    user.links.push(newLink);
     await user.save();
 
-    // Devolvemos los links actualizados
     res.status(201).json(user.links);
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error al agregar el link");
+    res.status(500).json({ msg: "Error al agregar link" });
   }
 };
 export const getLinks = async (req, res) => {
