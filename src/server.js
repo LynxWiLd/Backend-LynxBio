@@ -2,29 +2,40 @@ import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import dotenv from "dotenv";
-import connectDB from "./config/db.js"; // IMPORTANTE: El .js es obligatorio
+import connectDB from "./config/db.js"; 
 import authRoutes from "./routes/authRoutes.js";
 import linkRoutes from "./routes/linkRoutes.js";
 
+// 1. Configuración de entorno
 dotenv.config();
-const app = express();
 
+// 2. Conexión a la base de datos
 connectDB();
 
-app.use(cors());
-app.use(morgan("dev"));
-app.use(express.json());
-// ...
-app.use("/api/auth", authRoutes);
-app.use("/api/links", linkRoutes); // Agregamos esta
-// Rutas
-app.use("/api/auth", authRoutes);
+const app = express();
 
+// 3. Middlewares Globales
+app.use(cors()); // Permite peticiones desde Vercel
+app.use(morgan("dev")); // Logs de peticiones en consola
+app.use(express.json()); // Permite recibir JSON en el body
+
+// 4. Rutas
+app.use("/api/auth", authRoutes);
+app.use("/api/links", linkRoutes);
+
+// Ruta de chequeo de salud (Health Check)
 app.get("/", (req, res) => {
-  res.send("API de LynxBio funcionando con ES Modules 🚀");
+  res.send("🚀 LynxBio API está online y funcionando");
 });
 
-const PORT = process.env.PORT || 5000; // Render usará process.env.PORT
+// 5. Arranque del servidor
+const PORT = process.env.PORT || 5000;
+
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor corriendo en el puerto ${PORT}`);
+  console.log(`
+  ==========================================
+  ✅ Servidor corriendo en el puerto: ${PORT}
+  🌍 Modo: ${process.env.NODE_ENV || 'development'}
+  ==========================================
+  `);
 });
