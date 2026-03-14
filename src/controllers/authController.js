@@ -1,31 +1,38 @@
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { v2 as cloudinary } from 'cloudinary'; // Importante para borrar
+
+// --- FUNCIÓN AUXILIAR PARA BORRAR EN CLOUDINARY ---
+// Extrae el ID público de la URL: "https://.../folder/image_id.jpg" -> "folder/image_id"
+const deleteOldImage = async (url) => {
+  if (!url || !url.includes("cloudinary")) return;
+  try {
+    const parts = url.split('/');
+    const folderAndId = parts.slice(-2).join('/').split('.')[0]; // saca "folder/id"
+    await cloudinary.uploader.destroy(folderAndId);
+    console.log("Imagen eliminada de Cloudinary:", folderAndId);
+  } catch (err) {
+    console.error("Error al borrar en Cloudinary:", err);
+  }
+};
 
 // --- REGISTRO DE USUARIO ---
 export const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    console.log("Intentando registrar a:", email);
-
     let user = await User.findOne({ $or: [{ email }, { username }] });
-    if (user) {
-      return res.status(400).json({ msg: "El usuario o email ya existe" });
-    }
+    if (user) return res.status(400).json({ msg: "El usuario o email ya existe" });
 
     user = new User({ username, email, password });
-
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
-
     await user.save();
     
     const payload = { userId: user.id };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "24h" });
-
     res.status(201).json({ token, username: user.username });
   } catch (err) {
-    console.error("Error en Register:", err);
     res.status(500).json({ msg: "Error al registrar usuario" });
   }
 };
@@ -34,88 +41,76 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log("Intento de login para:", email);
-
     let user = await User.findOne({ email });
-    if (!user) {
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(400).json({ msg: "Credenciales inválidas" });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ msg: "Credenciales inválidas" });
-    }
-
-    const payload = { userId: user.id };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "24h" });
-
-    // IMPORTANTE: Devolvemos todo el objeto theme para que el Dashboard lo tenga al entrar
-    res.json({
-      token,
-      username: user.username,
-      profile: user.profile,
-      theme: user.theme, // Aquí ya viajan backgroundImage y textColor
-      socials: user.socials,
-    });
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: "24h" });
+    res.json({ token, username: user.username, profile: user.profile, theme: user.theme, socials: user.socials });
   } catch (err) {
-    console.error("Error en Login:", err);
     res.status(500).json({ msg: "Error en el servidor" });
   }
 };
 
-// --- OBTENER PERFIL PÚBLICO (Para la PublicPage) ---
+// --- OBTENER PERFIL PÚBLICO ---
 export const getPublicProfile = async (req, res) => {
   try {
     const { username } = req.params;
-    // Seleccionamos theme para que traiga el fondo y el color de texto
-    const user = await User.findOne({ username }).select(
-      "profile theme links socials username"
-    );
-
+    const user = await User.findOne({ username }).select("profile theme links socials username");
     if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
-
     res.json(user);
   } catch (err) {
-    console.error("Error en getPublicProfile:", err);
     res.status(500).json({ msg: "Error al obtener el perfil" });
   }
 };
 
-// --- ACTUALIZAR CONFIGURACIÓN (Privado) ---
+// --- ACTUALIZAR CONFIGURACIÓN ---
 export const updateSettings = async (req, res) => {
   try {
-    console.log("Datos recibidos para actualizar:", req.body);
-
     const { profile, theme, socials } = req.body;
-
-    // Actualizamos y pedimos que nos devuelva el documento nuevo ({new: true})
     const user = await User.findByIdAndUpdate(
       req.userId,
-      { 
-        $set: { profile, theme, socials } // Usamos $set para asegurar una actualización limpia
-      },
+      { $set: { profile, theme, socials } },
       { new: true, runValidators: true }
     );
-
     if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
-
     res.json(user);
   } catch (err) {
-    console.error("Error en updateSettings:", err);
-    res.status(500).json({ msg: "Error al guardar la configuración" });
+    res.status(500).json({ msg: "Error al guardar" });
   }
 };
 
-// --- OBTENER MI PROPIO PERFIL (Para el Dashboard) ---
+// --- OBTENER MI PROPIO PERFIL ---
 export const getMe = async (req, res) => {
   try {
-    // Traemos todo menos el password
     const user = await User.findById(req.userId).select("-password");
-    if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
-
     res.json(user);
   } catch (err) {
-    console.error("Error en getMe:", err);
-    res.status(500).json({ msg: "Error al obtener datos del usuario" });
+    res.status(500).send("Error al obtener datos");
+  }
+};
+
+// --- NUEVA: SUBIR IMAGEN CON LIMPIEZA ---
+export const uploadImage = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ msg: "No se subió ninguna imagen" });
+
+    const user = await User.findById(req.userId);
+    const { type } = req.body; // 'avatar' o 'bg'
+
+    // 1. Identificamos qué borrar
+    const oldUrl = type === 'avatar' ? user.profile.avatarUrl : user.theme.backgroundImage;
+
+    // 2. Borramos la vieja si existe
+    if (oldUrl) {
+      await deleteOldImage(oldUrl);
+    }
+
+    // 3. Devolvemos la nueva URL (req.file.path la genera multer-storage-cloudinary)
+    res.json({ url: req.file.path });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Error al gestionar la imagen" });
   }
 };

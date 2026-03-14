@@ -14,9 +14,10 @@ cloudinary.config({
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: 'lynxbio_avatars',
+    folder: 'lynxbio_uploads', // Nombre de carpeta más genérico
     allowed_formats: ['jpg', 'png', 'jpeg'],
-    transformation: [{ width: 500, height: 500, crop: 'limit' }]
+    // Sacamos el crop fijo para que los fondos no se rompan
+    transformation: [{ width: 1200, crop: 'limit' }] 
   },
 });
 
