@@ -24,7 +24,7 @@ app.get("/", (req, res) => {
   res.send("API de LynxBio funcionando con ES Modules 🚀");
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en el puerto ${PORT}`);
+const PORT = process.env.PORT || 5000; // Render usará process.env.PORT
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
