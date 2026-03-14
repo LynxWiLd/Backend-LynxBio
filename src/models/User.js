@@ -1,13 +1,5 @@
 import mongoose from "mongoose";
 
-const LinkSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  url: { type: String, required: true },
-  icon: { type: String },
-  active: { type: Boolean, default: true },
-  clicks: { type: Number, default: 0 },
-});
-
 const UserSchema = new mongoose.Schema(
   {
     username: {
@@ -23,12 +15,14 @@ const UserSchema = new mongoose.Schema(
       bio: { type: String, default: "" },
       avatarUrl: { type: String, default: "" },
     },
+    // --- ACTUALIZAMOS EL THEME ---
     theme: {
       backgroundColor: { type: String, default: "#ffffff" },
+      backgroundImage: { type: String, default: "" }, // Para la URL de Cloudinary
       buttonColor: { type: String, default: "#000000" },
       buttonTextColor: { type: String, default: "#ffffff" },
+      textColor: { type: String, default: "#000000" }, // Para el color de nombre y bio
     },
-    // 👇 ESTO ES LO QUE NECESITAMOS
     socials: {
       instagram: { type: String, default: "" },
       github: { type: String, default: "" },
@@ -36,13 +30,13 @@ const UserSchema = new mongoose.Schema(
     },
     links: [
       {
-        title: String,
-        url: String,
+        title: { type: String, required: true },
+        url: { type: String, required: true },
+        active: { type: Boolean, default: true },
       },
     ],
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
-// Exportación por defecto en ES Modules
 export default mongoose.model("User", UserSchema);
