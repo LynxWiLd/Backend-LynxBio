@@ -32,9 +32,10 @@ const UserSchema = new mongoose.Schema(
       {
         title: { type: String, required: true },
         url: { type: String, required: true },
-        // 👇 Agregamos estos dos campos a cada link individual
+        // 👇 Colores específicos para este botón
         buttonColor: { type: String, default: "#000000" },
         buttonTextColor: { type: String, default: "#ffffff" },
+        active: { type: Boolean, default: true },
       },
     ],
   },
