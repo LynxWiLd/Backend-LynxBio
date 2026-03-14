@@ -82,19 +82,20 @@ export const getPublicProfile = async (req, res) => {
 };
 // Agrega esta función a authController.js
 export const updateSettings = async (req, res) => {
-    try {
-        const { profile, theme } = req.body;
+  try {
+    // 1. ¡IMPORTANTE! Tenés que recibir 'socials' del req.body
+    const { profile, theme, socials } = req.body; 
 
-        const user = await User.findByIdAndUpdate(
-            req.userId,
-            { $set: { profile, theme } },
-            { new: true }
-        ).select('-password');
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { profile, theme, socials }, // 2. Agregalo acá también para que se guarde
+      { new: true }
+    );
 
-        res.json(user);
-    } catch (err) {
-        res.status(500).send('Error al actualizar la configuración');
-    }
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ msg: "Error al actualizar" });
+  }
 };
 export const getMe = async (req, res) => {
     try {

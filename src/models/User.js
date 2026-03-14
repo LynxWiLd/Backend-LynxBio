@@ -33,10 +33,9 @@ const UserSchema = new mongoose.Schema(
     },
     links: [LinkSchema],
     socials: {
-      instagram: String,
-      twitter: String,
-      github: String,
-      tiktok: String,
+      instagram: { type: String, default: "" },
+      github: { type: String, default: "" },
+      twitter: { type: String, default: "" },
     },
   },
   { timestamps: true },
