@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 
 const auth = (req, res, next) => {
-    // 1. Leer el token del header
+    // 1. Leer el token (se mantiene igual)
     const token = req.header('x-auth-token');
 
     // 2. Revisar si no hay token
@@ -9,17 +9,18 @@ const auth = (req, res, next) => {
         return res.status(401).json({ msg: 'No hay token, permiso denegado' });
     }
 
-    // 3. Validar el token
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // 3. Validar y extraer el userId directamente con destructuring
+        const { userId } = jwt.verify(token, process.env.JWT_SECRET);
         
-        // Añadimos el ID del usuario decodificado al objeto request (req)
-        // para que cualquier ruta protegida sepa quién está operando.
-        req.userId = decoded.userId;
+        // 4. Inyectar en el request
+        req.userId = userId;
         
-        next(); // ¡Todo bien! Pasa a la siguiente función
+        next(); 
     } catch (err) {
-        res.status(401).json({ msg: 'Token no es válido' });
+        // 💡 Tip extra: Si el token expiró, jwt.verify tira un error específico.
+        // Por ahora, este 401 genérico está perfecto para seguridad.
+        res.status(401).json({ msg: 'Token no es válido o ha expirado' });
     }
 };
 
