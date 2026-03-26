@@ -5,37 +5,39 @@ import {
     getPublicProfile, 
     updateSettings, 
     getMe,
-    uploadImage, // 🪄 Importamos la lógica de subida con limpieza
-    removeImage  // 🪄 Importamos el reseteo al IconProfile
+    uploadImage, 
+    removeImage 
 } from "../controllers/authController.js"; 
-import auth from '../middleware/auth.js';
+
+// 🛡️ Middleware de protección - Corregido a importación por defecto
+import protect from '../middleware/auth.js'; 
 import { upload } from '../config/cloudinary.js';
 
 const router = express.Router();
 
-// --- RUTAS DE AUTENTICACIÓN ---
+/**
+ * ==========================================
+ * 1. RUTAS PÚBLICAS
+ * ==========================================
+ */
 router.post("/register", register);
 router.post("/login", login); 
-router.get('/me', auth, getMe);
-
-// --- RUTAS DE PERFIL Y CONFIGURACIÓN ---
 router.get('/profile/:username', getPublicProfile);
-router.put('/settings', auth, updateSettings);
-
-// --- 🖼️ GESTIÓN DE IMÁGENES (AVATAR Y FONDO) ---
 
 /**
- * SUBIR IMAGEN
- * Usamos el middleware 'upload.single' para procesar el archivo
- * y luego 'uploadImage' para limpiar la imagen vieja en Cloudinary.
+ * ==========================================
+ * 2. RUTAS PRIVADAS (Requieren Token)
+ * ==========================================
  */
-router.post('/upload-avatar', auth, upload.single('image'), uploadImage);
+router.get('/me', protect, getMe);
+router.put('/settings', protect, updateSettings);
 
-/**
- * REMOVER IMAGEN
- * Esta ruta resetea el avatar al 'IconProfile' oficial 
- * y borra la imagen personalizada de Cloudinary para ahorrar espacio.
- */
-router.post('/remove-image', auth, removeImage);
+/* --- 🖼️ GESTIÓN DE IMÁGENES --- */
+
+// Subir avatar o fondo (usa multer + cloudinary y luego tu controlador)
+router.post('/upload-avatar', protect, upload.single('image'), uploadImage);
+
+// Resetear imagen al default
+router.post('/remove-image', protect, removeImage);
 
 export default router;

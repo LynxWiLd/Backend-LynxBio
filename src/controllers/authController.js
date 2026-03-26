@@ -1,98 +1,149 @@
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import { v2 as cloudinary } from 'cloudinary';
+import { generateToken } from "../utils/jwt.js"; // 🪄 Tu nueva herramienta de rastro
 
-// 🪄 LA CONSTANTE MAESTRA - Tu SVG de Cloudinary
+// 🪄 CONSTANTE MAESTRA - Identidad visual de LynxBio
 const DEFAULT_AVATAR = "https://res.cloudinary.com/dqlm5tnhk/image/upload/v1773873679/IconProfile_hoxpyj.svg";
 
-// --- FUNCIÓN AUXILIAR PARA BORRAR EN CLOUDINARY ---
+/**
+ * --- FUNCIÓN AUXILIAR: LIMPIEZA DE HUELLAS ---
+ * Borra imágenes de Cloudinary para no saturar el storage.
+ */
 const deleteOldImage = async (url) => {
-  // 🔒 SEGURIDAD: Si la URL es la predeterminada o no es de Cloudinary, NO la borramos
   if (!url || !url.includes("cloudinary") || url === DEFAULT_AVATAR) return;
   
   try {
     const parts = url.split('/');
+    // Extraemos el folder/public_id (ej: "avatars/nombre_archivo")
     const folderAndId = parts.slice(-2).join('/').split('.')[0];
     await cloudinary.uploader.destroy(folderAndId);
-    console.log("Imagen eliminada de Cloudinary:", folderAndId);
+    console.log("Rastro borrado de Cloudinary:", folderAndId);
   } catch (err) {
-    console.error("Error al borrar en Cloudinary:", err);
+    console.error("Error al limpiar rastro en Cloudinary:", err);
   }
 };
 
-// --- REGISTRO DE USUARIO ---
+/**
+ * --- REGISTRO DE USUARIO ---
+ */
 export const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
+
+    // 🛡️ Validación: No duplicados
     let user = await User.findOne({ $or: [{ email }, { username }] });
-    if (user) return res.status(400).json({ msg: "El usuario o email ya existe" });
+    if (user) {
+      return res.status(400).json({ msg: "El lince ya existe (email o username ocupado)." });
+    }
 
     user = new User({ 
       username, 
       email, 
       password,
-      profile: {
-        avatarUrl: DEFAULT_AVATAR, // Nace con el IconProfile
-        bio: ""
-      }
+      profile: { avatarUrl: DEFAULT_AVATAR, bio: "" }
     });
 
+    // Hash de seguridad
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
+    
     await user.save();
     
-    const payload = { userId: user.id };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "24h" });
-    res.status(201).json({ token, username: user.username });
+    // 🪄 Tokenización
+    const token = generateToken({ userId: user.id });
+
+    res.status(201).json({ 
+      token, 
+      username: user.username,
+      msg: "¡Bienvenido a la manada!" 
+    });
   } catch (err) {
-    res.status(500).json({ msg: "Error al registrar usuario" });
+    console.error("Error en Register:", err);
+    res.status(500).json({ msg: "Error al registrar rastro digital." });
   }
 };
 
-// --- LOGIN DE USUARIO ---
+/**
+ * --- LOGIN DE USUARIO ---
+ */
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    let user = await User.findOne({ email });
+
+    // Buscamos al lince
+    const user = await User.findOne({ email });
     if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(400).json({ msg: "Credenciales inválidas" });
+      return res.status(400).json({ msg: "Credenciales inválidas. Revisá tu rastro." });
     }
 
-    // Si el login es exitoso pero no tiene avatar por alguna razón (usuario viejo)
+    // Fix preventivo para usuarios sin avatar
     if (!user.profile.avatarUrl) {
       user.profile.avatarUrl = DEFAULT_AVATAR;
       await user.save();
     }
 
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: "24h" });
-    res.json({ token, username: user.username, profile: user.profile, theme: user.theme, socials: user.socials });
+    // 🪄 Tokenización
+    const token = generateToken({ userId: user.id });
+
+    res.json({ 
+      token, 
+      username: user.username, 
+      profile: user.profile, 
+      theme: user.theme, 
+      socials: user.socials 
+    });
   } catch (err) {
-    res.status(500).json({ msg: "Error en el servidor" });
+    console.error("Error en Login:", err);
+    res.status(500).json({ msg: "Error en el servidor al iniciar sesión." });
   }
 };
 
-// --- OBTENER PERFIL PÚBLICO ---
+/**
+ * --- OBTENER MI PROPIO PERFIL ---
+ * (Requiere Middleware de Protección)
+ */
+export const getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select("-password");
+    if (!user) return res.status(404).json({ msg: "Lince no encontrado." });
+
+    if (user.profile && !user.profile.avatarUrl) {
+      user.profile.avatarUrl = DEFAULT_AVATAR;
+    }
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ msg: "Error al obtener datos de la manada." });
+  }
+};
+
+/**
+ * --- OBTENER PERFIL PÚBLICO ---
+ * (Sin protección - Para que cualquiera vea el LynxBio)
+ */
 export const getPublicProfile = async (req, res) => {
   try {
     const { username } = req.params;
     const user = await User.findOne({ username }).select("profile theme links socials username");
-    if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
+    
+    if (!user) return res.status(404).json({ msg: "Este rastro no existe." });
 
-    // Refuerzo visual
     if (!user.profile.avatarUrl) user.profile.avatarUrl = DEFAULT_AVATAR;
 
     res.json(user);
   } catch (err) {
-    res.status(500).json({ msg: "Error al obtener el perfil" });
+    res.status(500).json({ msg: "Error al obtener el rastro público." });
   }
 };
 
-// --- ACTUALIZAR CONFIGURACIÓN ---
+/**
+ * --- ACTUALIZAR CONFIGURACIÓN ---
+ */
 export const updateSettings = async (req, res) => {
   try {
     const { profile, theme, socials } = req.body;
 
+    // Mantenemos el rastro default si el usuario borra la URL
     if (profile && !profile.avatarUrl) {
       profile.avatarUrl = DEFAULT_AVATAR;
     }
@@ -101,59 +152,51 @@ export const updateSettings = async (req, res) => {
       req.userId,
       { $set: { profile, theme, socials } },
       { new: true, runValidators: true }
-    );
-    if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
+    ).select("-password");
+
+    if (!user) return res.status(404).json({ msg: "Usuario no encontrado." });
+    
     res.json(user);
   } catch (err) {
-    res.status(500).json({ msg: "Error al guardar" });
+    res.status(500).json({ msg: "Error al guardar tu nueva facha." });
   }
 };
 
-// --- OBTENER MI PROPIO PERFIL ---
-export const getMe = async (req, res) => {
-  try {
-    const user = await User.findById(req.userId).select("-password");
-    if (user && user.profile && !user.profile.avatarUrl) {
-      user.profile.avatarUrl = DEFAULT_AVATAR;
-    }
-    res.json(user);
-  } catch (err) {
-    res.status(500).send("Error al obtener datos");
-  }
-};
-
-// --- SUBIR IMAGEN CON LIMPIEZA ---
+/**
+ * --- SUBIR IMAGEN CON LIMPIEZA ---
+ */
 export const uploadImage = async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ msg: "No se subió ninguna imagen" });
+    if (!req.file) return res.status(400).json({ msg: "No se subió ninguna imagen." });
+    
     const user = await User.findById(req.userId);
-    const { type } = req.body; 
+    const { type } = req.body; // 'avatar' o 'bg'
 
+    // Limpiamos la imagen anterior antes de asignar la nueva
     const oldUrl = type === 'avatar' ? user.profile.avatarUrl : user.theme.backgroundImage;
     if (oldUrl) await deleteOldImage(oldUrl);
 
+    // Devolvemos el path que nos da Multer-Cloudinary
     res.json({ url: req.file.path });
   } catch (err) {
-    res.status(500).json({ msg: "Error al gestionar la imagen" });
+    res.status(500).json({ msg: "Error al gestionar el rastro visual." });
   }
 };
 
-// --- 🪄 NUEVA: REMOVER IMAGEN Y ASIGNAR DEFAULT ---
+/**
+ * --- REMOVER IMAGEN Y ASIGNAR DEFAULT ---
+ */
 export const removeImage = async (req, res) => {
   try {
-    const { type } = req.body; // 'avatar' o 'bg'
+    const { type } = req.body; 
     const user = await User.findById(req.userId);
 
-    if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
+    if (!user) return res.status(404).json({ msg: "Lince no encontrado." });
 
     if (type === 'avatar') {
-      const oldUrl = user.profile.avatarUrl;
-      // Borramos de Cloudinary si no es el default
-      await deleteOldImage(oldUrl);
-      // Seteamos de vuelta el rastro original
+      await deleteOldImage(user.profile.avatarUrl);
       user.profile.avatarUrl = DEFAULT_AVATAR;
     } else {
-      // Si es fondo, limpiamos de Cloudinary y vaciamos el campo
       if (user.theme.backgroundImage) {
         await deleteOldImage(user.theme.backgroundImage);
       }
@@ -163,7 +206,6 @@ export const removeImage = async (req, res) => {
     await user.save();
     res.json(user);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: "Error al resetear imagen" });
+    res.status(500).json({ msg: "Error al resetear imagen." });
   }
 };
